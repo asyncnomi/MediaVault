@@ -5,11 +5,7 @@ const fs = require('fs');
 const PATH = fs.readFileSync("path.txt").toString().replace("\n","").replace("\r","").trim()
 const CryptoJS = require("crypto-js");
 
-const master = 'd627563b28996827533f48c7bc7d5'+
-               'e02e1ff1daaa5c069d0cf70999ead'+
-               '334dad2e1ffdb9a06f24771942306'+
-               '0d6458847e349f6be518b39eb3bf0'+
-               'c1d9fa91b3f9';
+const master = 'SHA512 of the master key';
 
 fastify.register(require('@fastify/static'), {
   root: path.join(__dirname, 'static'),
