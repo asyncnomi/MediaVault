@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
+  <link rel="apple-touch-icon" href="images/mv-icon-192.png">
+  <meta name="theme-color" content="black"/>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="MediaVault">
+  <meta name="msapplication-TileImage" content="images/mv-icon-512.png">
+  <meta name="msapplication-TileColor" content="#FFFFFF">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div id="wrapper">
+  <div id="top_panel">
+    <input type="text" id="search" placeholder="Search"></input>
+    <select name="lib_name" onChange="refresh_selector(this.value)" id="selector"></select>
+    <input id="add_btn" type="button" value="Add a library"></input>
+  </div>
+  <div id="main_panel">
+    <div id="left_panel">
+    </div>
+    <div id="center_panel">
+      <div id="main"></div>
+      <div id="bottom_sep"></div>
+      <div id="bottom_panel">
+        <p id="path"></p>
+        <input id="scan_btn" type="button" value="Scan this library"></input>
+        <p id="indicator"></p>
+        <input id="del_btn" type="button" value="Delete this library"></input>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="popup">
+  <div id="blur"></div>
+  <div id="add_popup" class="popup">
+    <input id="add_folder" placeholder="Relative lib path" type="text"></input>
+    <input id="add_type" placeholder="Library type : 'show' or 'movie'" type="text"></input>
+    <input id="add_name" placeholder="Set a name for this library" type="text"></input>
+    <input id="add_pwd" placeholder="Password" type="password"></input>
+    <span>
+      <input id="add_cancel" class="cancel" type="button" value="Cancel"></input>
+      <input id="add_submit" class="submit" type="button" value="Add"></input>
+    </span>
+  </div>
+  <div id="del_popup" class="popup">
+    <input id="del_pwd" placeholder="Password" type="password"></input>
+    <span>
+      <input id="del_cancel" class="cancel" type="button" value="Cancel"></input>
+      <input id="del_submit" class="submit" type="button" value="Confirm"></input>
+    </span>
+  </div>
+</div>
+<script>
+  var PATH;
+  var data;
+  var current = {
+    lib: undefined,
+    parent: undefined,
+    file: undefined
+  }
+  var prefix = "cdn/"
+
+  window.onload = async () => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
+    PATH = await request_get('path')
+    console.log(PATH)
+    for (var i=0; i < document.getElementsByClassName("cancel").length; i++) {
+      document.getElementsByClassName("cancel")[i].addEventListener('click', () => {
+        popup_close();
+      })
+    }
+    data = await retrieve()
+    console.log(data)
+    if (Object.keys(data).length != 0) {
+      refresh();
+    }
+  }
+
+  window.onpopstate = history.onpushstate = function(e) {
+    console.log(e.state)
+    current = e.state;
+    if (current.file && current.parent) {
+      load_file(current.file, current.parent, false)
+    } else {
+      refresh();
+    }
+  };
+
+  document.getElementById("add_btn").addEventListener('click', () => {
+    popup_show("add_popup")
+  })
+
+  document.getElementById("del_btn").addEventListener('click', () => {
+    popup_show("del_popup")
+  })
+
+  document.getElementById("blur").addEventListener('click', () => {
+    popup_close()
+  })
+
+  function popup_show(elem) {
+    document.getElementById("popup").style.display = "flex";
+    document.getElementById("blur").style.display = "block";
+    document.getElementById(elem).style.display = "flex";
+  }
+
+  function popup_close() {
+    document.getElementById("popup").style.display = "none";
+    document.getElementById("blur").style.display = "none";
+    for (var i=0; i < document.getElementsByClassName("popup").length; i++) {
+      document.getElementsByClassName("popup")[i].style.display = "none";
+    }
+  }
+
+  document.getElementById("add_submit").addEventListener('click', async () => {
+    var path = document.getElementById("add_folder").value
+    var type = document.getElementById("add_type").value
+    var name = document.getElementById("add_name").value
+    var pwd = document.getElementById("add_pwd").value
+    document.getElementById("add_pwd").value = "";
+    var res = await request_post('/add', {
+      path: path,
+      type: type,
+      name: name,
+      pwd: pwd
+    })
+    var response = JSON.parse(res)
+    if (response.sucess) {
+      document.getElementById("add_folder").value = "";
+      document.getElementById("add_type").value = "";
+      document.getElementById("add_name").value = "";
+      data = await retrieve();
+      popup_close();
+      refresh();
+    } else {
+      alert(response.error);
+    }
+    console.log(res)
+  })
+
+  document.getElementById("scan_btn").addEventListener('click', async () => {
+    if (current.lib) {
+      var indicator = document.getElementById("indicator")
+      var id = setInterval(() => {
+        if (indicator.innerHTML == "...") {
+          indicator.innerHTML = "."
+        } else {
+          indicator.innerHTML = indicator.innerHTML+"."
+        }
+      }, 200)
+      var name = current.lib
+      var res = await request_post('/scan', {
+        name: name
+      })
+      res = JSON.parse(res)
+      if (res.sucess) {
+        data = await retrieve();
+        refresh()
+      } else {
+        alert(res.error)
+      }
+      clearInterval(id)
+      indicator.innerHTML = "OK"
+      setTimeout(() => {
+        indicator.innerHTML = ""
+      }, 1000)
+    } else {
+      alert("Please start by adding a library")
+    }
+  })
+
+  document.getElementById("del_submit").addEventListener('click', async () => {
+    if (current.lib) {
+      var name = current.lib
+      var pwd = document.getElementById("del_pwd").value
+      document.getElementById("del_pwd").value = "";
+      var res = await request_post('/del', {
+        name: name,
+        pwd: pwd
+      })
+      res = JSON.parse(res)
+      if (res.sucess) {
+        data = await retrieve();
+        current.lib = undefined;
+        popup_close();
+        refresh()
+      } else {
+        alert(res.error)
+      }
+    } else {
+      alert("Please start by adding a library before deleting it, what ?")
+      popup_close();
+    }
+  })
+
+  document.getElementById("search").addEventListener('input', function() {
+    var input = this.value.toLowerCase().replaceAll(" ", "")
+    if (input == "") input = undefined;
+    load_library(current.lib, input)
+  })
+
+  async function retrieve() {
+    var res = await request_get('/retrieve');
+    var libraries = JSON.parse(res);
+    return libraries;
+  }
+
+  function clear() {
+    document.getElementById("main").innerHTML = "";
+    document.getElementById("main").style.backgroundImage = "";
+    document.getElementById("main").style.alignItems = "unset";
+    document.getElementById("main").style.flexDirection = "column";
+    document.getElementById("main").style.height = "calc(100% - 72px)";
+    document.getElementById("main").style.flexWrap = "unset";
+    document.getElementById("bottom_sep").style.display = "flex";
+    document.getElementById("bottom_panel").style.display = "flex";
+    if (window.innerWidth > 600) {
+      document.getElementById("main").style.width = "calc(100% - 10px)";
+      document.getElementById("main").style.margin = "10px";
+    }
+  }
+
+  function refresh() {
+    clear()
+    document.getElementById("left_panel").innerHTML = "";
+    document.getElementById("selector").innerHTML = "";
+    for (lib_name in data) {
+      document.getElementById("left_panel").insertAdjacentHTML("beforeend", `
+        <div id="`+lib_name+`" class="lib_select">
+          <span class="lib_name">`+lib_name+`</span>
+          <span class="lib_type">`+data[lib_name].type+`</span>
+        </div>
+      `);
+      document.getElementById("selector").insertAdjacentHTML("beforeend", `
+        <option class="lib_option" id="`+lib_name+`" value="`+lib_name+`">`+lib_name+`</option>
+      `)
+    }
+    refresh_listener();
+    if (Object.keys(data).length != 0) {
+      if (!current.lib) {
+        current.lib = Object.keys(data)[0];
+        history.pushState(current, "", "")
+      }
+      load_library(current.lib, undefined);
+      document.getElementById("selector").value = current.lib;
+    }
+  }
+
+  function refresh_selector(val) {
+    current.lib = val;
+    load_library(current.lib, undefined);
+    history.pushState(current, "", "")
+  }
+
+  function refresh_listener() {
+    var stack = document.getElementsByClassName("lib_select")
+    for (var i = 0; i < stack.length; i++) {
+      var lib_name = stack[i].childNodes[1].innerHTML;
+      stack[i].addEventListener('click', function() {
+        if (current.lib != this.id || current.file) {
+          current.lib = this.id;
+          current.file = undefined;
+          current.parent = undefined;
+          document.getElementById("main").style.backgroundImage = "";
+          document.getElementById("main").style.alignItems = "unset";
+          history.pushState(current, "", "")
+          load_library(this.id, undefined);
+        }
+      });
+    }
+  }
+
+  function load_library(lib, filter) {
+    current.lib = lib
+    clear();
+    document.getElementById("path").innerHTML = data[lib].path;
+    if (data[lib].type == "movie") {
+      document.getElementById("main").style.flexDirection = "column";
+      for (var catg in data[lib].lib) {
+        document.getElementById("main").insertAdjacentHTML("beforeend", `
+          <div class="movie" id="`+catg+`"></div>
+        `)
+        for (var elem in data[lib].lib[catg].meta) {
+          var movie = data[lib].lib[catg].meta[elem];
+          if (filter) {
+            if (!movie.name.toLowerCase().replaceAll(" ", "").includes(filter)) {
+              continue
+            }
+          }
+          document.getElementById(catg).insertAdjacentHTML("beforeend", `
+            <div class="file" id="`+elem+`">
+              <image class="thumb" src="`+movie.thumb+`"></image>
+              <span class="title">`+movie.name+`</span>
+              <span class="release">`+movie.release+`</span>
+            </div>
+          `);
+        }
+      }
+    } else if (data[lib].type == "show") {
+      document.getElementById("main").style.flexDirection = "row";
+      document.getElementById("main").style.flexWrap = "wrap";
+      document.getElementById("main").insertAdjacentHTML("beforeend", `<div id="main_flex"></div>`)
+      for (var elem in data[lib].lib) {
+        var serie = data[lib].lib[elem];
+        if (filter) {
+          if (!serie.name.toLowerCase().replaceAll(" ", "").includes(filter)) {
+            continue
+          }
+        }
+        document.getElementById("main_flex").insertAdjacentHTML("beforeend", `
+          <div class="file" id="`+elem+`">
+            <image class="thumb" src="`+serie.thumb+`"></image>
+            <span class="title">`+serie.name+`</span>
+            <span class="release">`+serie.release+`</span>
+          </div>
+        `)
+      }
+    }
+    var stack = document.getElementsByClassName("file");
+    for (var i = 0; i < stack.length; i++) {
+      stack[i].addEventListener('click', function() {
+        load_file(this.id, this.parentNode.id, true);
+      });
+    }
+  }
+
+  function load_file(file, parent, push) {
+    current.file = file
+    current.parent = parent
+    if (push) {
+      history.pushState(current, "", "")
+    }
+    clear();
+    document.getElementById("bottom_sep").style.display = "none";
+    document.getElementById("bottom_panel").style.display = "none";
+    document.getElementById("main").style.height = "100%";
+    document.getElementById("main").style.width = "calc(100% - 1px)";
+    document.getElementById("main").style.margin = "0px";
+    if (data[current.lib].type == "movie") {
+      var file = data[current.lib].lib[parent].meta[current.file];
+      document.getElementById("main").style.backgroundImage = "url('"+file.backdrop+"')"
+      document.getElementById("main").style.alignItems = "center";
+      var play;
+      if (["Android", "iOS"].includes(get_os())) {
+        play = `
+          <a href="vlc://`+location.href+data[current.lib].lib[current.parent].content[current.file].replace(PATH,prefix)+`">
+            <input id="play_`+current.file+`" type="button" class="play" value="PLAY"></input>
+          </a>`
+      } else {
+        play = `
+          <a href="/play.html?src=`+location.href+data[current.lib].lib[current.parent].content[current.file].replace(PATH,prefix)+`" target="_blank">
+            <input id="play_`+current.file+`" type="button" class="play" value="PLAY"></input>
+          </a>`
+      }
+      document.getElementById("main").insertAdjacentHTML("beforeend", `
+        <div class="film" id="`+current.file+`">
+          <image class="thumb_film" src="`+file.thumb+`"></image>
+          <span class="details">
+            <span class="title_film">`+file.name+`</span>
+            <span class="release_film">`+file.release+`</span>
+            <span class="overview">`+file.overview+`</span>
+            `+play+`
+          </span>
+        </div>
+      `)
+    } else if (data[current.lib].type == "show") {
+      var serie = data[current.lib].lib[file];
+      document.getElementById("main").style.backgroundImage = "url('"+serie.backdrop+"')"
+      document.getElementById("main").style.alignItems = "center";
+      document.getElementById("main").insertAdjacentHTML("beforeend", `
+        <div class="film" id="`+current.file+`">
+          <div id="serie">
+            <image class="thumb_film" src="`+serie.thumb+`"></image>
+            <span class="details">
+              <span class="title_film">`+serie.name+`</span>
+              <span class="release_film">`+serie.release+`</span>
+              <span class="overview">`+serie.overview+`</span>
+            </span>
+          </div>
+        </div>
+      `)
+      document.getElementById(current.file).style.flexDirection = "column";
+      var content = serie.content;
+      for (var season in content) {
+        var season_meta = serie.meta[season]
+        document.getElementById(current.file).insertAdjacentHTML('beforeend', `
+          <div class="season">
+            <span class="season_number">Season: `+season+`</span>
+            <span class="season_release">`+season_meta.release+`</span>
+              <span class="season_overview">`+season_meta.overview+`</span>
+          </div>
+        `)
+        for (var episode in content[season]) {
+          var episode_meta = serie.meta[season][episode];
+          if (["Android", "iOS"].includes(get_os())) {
+            play = `
+              <a href="vlc://`+location.href+content[season][episode].replace(PATH,prefix)+`">
+                <input id="play_`+season+`|`+episode+`" type="button" class="play" value="PLAY"></input>
+              </a>`
+          } else {
+            play = `
+              <a href="/play.html?src=`+location.href+content[season][episode].replace(PATH,prefix)+`" target="_blank">
+                <input id="play_`+season+`|`+episode+`" type="button" class="play" value="PLAY"></input>
+              </a>`
+          }
+          document.getElementById(current.file).insertAdjacentHTML('beforeend', `
+            <div class="episode">
+              <image class="thumb_film" src="`+episode_meta.thumb+`"></image>
+              <span class="details">
+                <span class="title_film">`+episode_meta.name+`</span>
+                <span class="overview">`+episode_meta.overview+`</span>
+                `+play+`
+              </span>
+            </div>
+          `);
+        }
+      }
+    }
+  }
+
+  function request_get(url) {
+    return new Promise((resolve, reject) => {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", url, true);
+      xhr.setRequestHeader("Content-Type", "application/json");
+
+      xhr.onload = () => {
+        resolve(xhr.response)
+      }
+      xhr.send();
+    })
+  }
+
+  function request_post(url, body) {
+    return new Promise((resolve, reject) => {
+      var xhr = new XMLHttpRequest();
+      xhr.open("POST", url, true);
+      xhr.setRequestHeader("Content-Type", "application/json");
+
+      xhr.onload = () => {
+        resolve(xhr.response)
+      }
+      xhr.send(JSON.stringify(body));
+    })
+  }
+
+  function get_os() {
+    var userAgent = window.navigator.userAgent,
+        platform = window.navigator?.userAgentData?.platform || window.navigator.platform,
+        macosPlatforms = ['Macintosh', 'MacIntel', 'MacPPC', 'Mac68K'],
+        windowsPlatforms = ['Win32', 'Win64', 'Windows', 'WinCE'],
+        iosPlatforms = ['iPhone', 'iPad', 'iPod'],
+        os = null;
+
+    if (macosPlatforms.indexOf(platform) !== -1) {
+      os = 'Mac OS';
+    } else if (iosPlatforms.indexOf(platform) !== -1) {
+      os = 'iOS';
+    } else if (windowsPlatforms.indexOf(platform) !== -1) {
+      os = 'Windows';
+    } else if (/Android/.test(userAgent)) {
+      os = 'Android';
+    } else if (/Linux/.test(platform)) {
+      os = 'Linux';
+    }
+
+    return os;
+  }
+</script>
+
+</body>
+</html>

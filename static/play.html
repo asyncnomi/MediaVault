@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="play.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body>
+    <video id="video" src="" controls=""></video>
+    <script>
+      var video = document.getElementById("video")
+      video.setAttribute('src', location.href.substring(location.href.indexOf("/play.html?src=")+15))
+      video.load();
+      video.play();
+    </script>
+  </body>
+</html>
