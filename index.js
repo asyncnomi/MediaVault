@@ -150,9 +150,9 @@ fastify.post('/add', async (request, reply) => {
           return
         }
     if (request.body.pwd.trim() == ""
-        && request.body.path.trim() == ""
-        && request.body.type.trim() == ""
-        && request.body.name.trim() == "") {
+        || request.body.path.trim() == ""
+        || request.body.type.trim() == ""
+        || request.body.name.trim() == "") {
           reply.send(JSON.stringify({
             sucess: false,
             error: "Please fill all the fields."
