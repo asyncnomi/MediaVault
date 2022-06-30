@@ -1,5 +1,5 @@
 # MediaVault
-plex like media organizer as middleman between ftp server and vlc or browser media player.  
+A plex like media organizer as middleman between ftp server and vlc or browser media player.  
 The root path must be defined in path.txt, any file in this folder will become publicly available to stream (read-only)  
 A SHA512 hash of the master key used to make changes requiring write access need to be set in the index.js file
 
