@@ -12,6 +12,7 @@
   <meta name="msapplication-TileImage" content="images/mv-icon-512.png">
   <meta name="msapplication-TileColor" content="#FFFFFF">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MediaVault</title>
 </head>
 <body>
 <div id="wrapper">
@@ -37,6 +38,12 @@
 </div>
 <div id="popup">
   <div id="blur"></div>
+  <div id="auth_popup" class="popup">
+    <input id="auth_pwd" placeholder="Password" type="password"></input>
+    <span>
+      <input id="auth_submit" class="submit" type="button" value="Confirm"></input>
+    </span>
+  </div>
   <div id="add_popup" class="popup">
     <input id="add_folder" placeholder="Relative lib path" type="text"></input>
     <input id="add_type" placeholder="Library type : 'show' or 'movie'" type="text"></input>
@@ -69,17 +76,22 @@
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js');
     }
-    PATH = await request_get('path')
-    console.log(PATH)
     for (var i=0; i < document.getElementsByClassName("cancel").length; i++) {
       document.getElementsByClassName("cancel")[i].addEventListener('click', () => {
         popup_close();
       })
     }
-    data = await retrieve()
-    console.log(data)
-    if (Object.keys(data).length != 0) {
-      refresh();
+    var auth_state = await authcheck();
+    if (!auth_state) {
+      popup_show("auth_popup");
+    } else {
+      PATH = await request_get('path')
+      console.log(PATH)
+      data = await retrieve()
+      console.log(data)
+      if (Object.keys(data).length != 0) {
+        refresh();
+      }
     }
   }
 
@@ -118,6 +130,26 @@
       document.getElementsByClassName("popup")[i].style.display = "none";
     }
   }
+
+  document.getElementById("auth_submit").addEventListener('click', async () => {
+    var pwd = document.getElementById("auth_pwd").value;
+    document.getElementById("auth_pwd").value = "";
+    var res = await request_post('/auth', {auth: pwd});
+    var response = JSON.parse(res)
+    if (response.sucess) {
+      document.cookie = "auth="+response.auth+"; expires=Fri, 31 Dec 9999 23:59:59 GMT; SameSite=None; Secure";
+      data = await retrieve();
+      popup_close();
+      PATH = await request_get('path')
+      console.log(PATH)
+      console.log(data)
+      if (Object.keys(data).length != 0) {
+        refresh();
+      }
+    } else {
+      alert(response.error);
+    }
+  })
 
   document.getElementById("add_submit").addEventListener('click', async () => {
     var path = document.getElementById("add_folder").value
@@ -210,6 +242,15 @@
     var res = await request_get('/retrieve');
     var libraries = JSON.parse(res);
     return libraries;
+  }
+
+  async function authcheck() {
+    var auth = document.cookie.match(/^(.*;)?\s*auth\s*=\s*[^;]+(.*)?$/);
+    if (auth === null) {return false};
+    auth = auth[0].substring("auth=".length);
+    var res = await request_post('/checkauth', {auth: auth});
+    res = JSON.parse(res)
+    return res.sucess
   }
 
   function clear() {
@@ -350,7 +391,12 @@
       document.getElementById("main").style.backgroundImage = "url('"+file.backdrop+"')"
       document.getElementById("main").style.alignItems = "center";
       var play;
-      if (["Android", "iOS"].includes(get_os())) {
+      if (get_os() == "Windows") {
+        play = `
+          <a href="`+location.href+data[current.lib].lib[current.parent].content[current.file].replace(PATH,prefix)+`">
+            <input id="play_`+current.file+`" type="button" class="play" value="RIGHT CLICK TO OPEN IN VLC"></input>
+          </a>`
+      } else if (["Android", "iOS"].includes(get_os())) {
         play = `
           <a href="vlc://`+location.href+data[current.lib].lib[current.parent].content[current.file].replace(PATH,prefix)+`">
             <input id="play_`+current.file+`" type="button" class="play" value="PLAY"></input>
@@ -401,7 +447,13 @@
         `)
         for (var episode in content[season]) {
           var episode_meta = serie.meta[season][episode];
-          if (["Android", "iOS"].includes(get_os())) {
+          if (get_os() == "Windows") {
+            play = `
+              <a href="`+location.href+content[season][episode].replace(PATH,prefix)+`">
+                <input id="play_`+current.file+`" type="button" class="play" value="RIGHT CLICK TO OPEN IN VLC"></input>
+              </a>`
+          }
+          else if (["Android", "iOS"].includes(get_os())) {
             play = `
               <a href="vlc://`+location.href+content[season][episode].replace(PATH,prefix)+`">
                 <input id="play_`+season+`|`+episode+`" type="button" class="play" value="PLAY"></input>
