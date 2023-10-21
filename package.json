@@ -1,9 +1,12 @@
 {
   "dependencies": {
     "@fastify/static": "^6.4.0",
-    "fastify": "^4.1.0",
+    "crypto-js": "^4.1.1",
+    "cryptojs": "^2.5.3",
+    "fastify": "^3.29.0",
     "fastify-favicon": "^4.0.0",
-    "fastify-static": "^4.7.0"
+    "fastify-static": "^4.7.0",
+    "uuid": "^9.0.1"
   },
   "name": "mediavault-main",
   "description": "plex like media organizer as middleman between ftp server and vlc",
