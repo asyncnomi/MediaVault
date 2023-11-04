@@ -95,7 +95,7 @@ async function add_metada_show(library) {
                 for (var candidate in candidates.results) {
                     var name = candidates.results[candidate].name
 		    var original_name = candidates.results[candidate].original_name
-                    var distance = sift3Distance(esn.clean(sub_entry), esn.clean(name+original_name.substring(0,5)))
+                    var distance = sift3Distance(esn.clean(entry.toLowerCase()), esn.clean(name.toLowerCase()))
                     if (distance < min || min == -1) {
                         min = distance
                         id = candidates.results[candidate].id
