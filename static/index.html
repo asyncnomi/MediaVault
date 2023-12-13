@@ -391,7 +391,7 @@
       document.getElementById("main").style.backgroundImage = "url('"+file.backdrop+"')"
       document.getElementById("main").style.alignItems = "center";
       var play;
-      if (get_os() == "Windows") {
+      if (["Windows", "Linux"].includes(get_os())) {
         play = `
           <a href="`+location.href+data[current.lib].lib[current.parent].content[current.file].replace(PATH,prefix)+`">
             <input id="play_`+current.file+`" type="button" class="play" value="RIGHT CLICK TO OPEN IN VLC"></input>
@@ -447,7 +447,7 @@
         `)
         for (var episode in content[season]) {
           var episode_meta = serie.meta[season][episode];
-          if (get_os() == "Windows") {
+          if (["Windows", "Linux"].includes(get_os())) {
             play = `
               <a href="`+location.href+content[season][episode].replace(PATH,prefix)+`">
                 <input id="play_`+current.file+`" type="button" class="play" value="RIGHT CLICK TO OPEN IN VLC"></input>
