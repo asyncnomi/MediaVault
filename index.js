@@ -15,6 +15,7 @@ const { v4: uuidv4 } = require('uuid');
 const master = 'SHA512 of the master key';
 
 var authorized = [];
+var authorized_su = [];
 
 fastify.register(require('fastify-static'), {
   root: path.join(__dirname, 'static'),
@@ -56,7 +57,7 @@ fastify.post('/checkauth', async (request, reply) => {
     }))
     return
   }
-  if (authorized.includes(hash)) {
+  if (authorized.includes(hash) || authorized_su.includes(hash)) {
     reply.send(JSON.stringify({
       sucess: true
     }))
@@ -78,8 +79,11 @@ fastify.post('/auth', async (request, reply) => {
     return
   }
   var hash;
+  var su_atp = false;
   try {
-    hash = CryptoJS.SHA512(request.body.auth).toString();
+    var arr = request.body.auth.split("+")
+    if (arr[1] == "prv") su_atp = true;
+    hash = CryptoJS.SHA512(arr[0]).toString();
   } catch {
     reply.send(JSON.stringify({
       sucess: false,
@@ -90,7 +94,8 @@ fastify.post('/auth', async (request, reply) => {
   if (hash === master) {
     var cookie = uuidv4();
     var ck_hash = CryptoJS.SHA512(cookie).toString();
-    authorized.push(ck_hash);
+    if (su_atp) authorized_su.push(ck_hash);
+    if (!su_atp) authorized.push(ck_hash);
     reply.send(JSON.stringify({
       sucess: true,
       auth: cookie
@@ -118,12 +123,12 @@ fastify.get('/retrieve', async (request, reply) => {
       reply.send("{}");
       return
     }
-    if (authorized.includes(hash)) {
+    if (authorized_su.includes(hash) || authorized.includes(hash)) {
       var folder = 'libraries/'
       var lib_arr = {}
       fs.readdirSync(folder).forEach(function(file) {
         new_file = folder+'/'+file;
-        lib_arr[file] = JSON.parse(fs.readFileSync(new_file))
+        if ((file.includes("prv") && authorized_su.includes(hash)) || !file.includes("prv")) lib_arr[file] = JSON.parse(fs.readFileSync(new_file));
       });
       reply.send(JSON.stringify(lib_arr))
     } else {reply.send("{}"); return}
