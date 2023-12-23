@@ -175,7 +175,7 @@ function get_tree(folder) {
         );
         file = file.replace(/[ _]/g, "-");
         file = file.replace(
-            /[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}-?[89ab][a-f0-9]{3>
+            /[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}/g,
             ""
         );
         var stat = filesystem.statSync(new_file);
@@ -183,7 +183,7 @@ function get_tree(folder) {
         var uid_idx = new_name.lastIndexOf(".");
         if (!stat.isDirectory())
             new_name =
-                new_name.slice(0, uid_idx) + uuidv4() + new_name.slic>
+                new_name.slice(0, uid_idx) + uuidv4() + new_name.slice(uid_idx);
         filesystem.renameSync(new_file, new_name, function (e) {
             console.log(e);
         });
