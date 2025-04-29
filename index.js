@@ -136,48 +136,75 @@ fastify.get('/retrieve', async (request, reply) => {
 })
 
 fastify.post('/scan', async (request, reply) => {
-    if (!request.body.hasOwnProperty("name")) {
-      reply.send(JSON.stringify({
-        sucess: false,
-        error: "No 'name' argument passed"
-      }))
-      return
-    }
-    if (request.body.name.trim() == "") {
-      reply.send(JSON.stringify({
-        sucess: false,
-        error: "Empty 'name' argument"
-      }))
-      return
-    }
-    var lib_path = 'libraries/'+request.body.name
-    var library;
+  var auth_arr = request.raw.rawHeaders.filter((hd) => hd.startsWith("auth="));
+  if (auth_arr.length > 0) {
+    var hash = "";
     try {
-      library = JSON.parse(fs.readFileSync(lib_path))
-    } catch (err) {
+      hash = CryptoJS.SHA512(auth_arr[0].substring("auth=".length)).toString();
+    } catch {
       reply.send(JSON.stringify({
         sucess: false,
-        error: "Library not found"
-      }))
+        error: "Not authenticated"
+      }));
       return
     }
-    try {
-      library.lib = await organizer.folder(library.path, library.type)
-    } catch (err) {
+    if (authorized_su.includes(hash) || authorized.includes(hash)) {
+      if (!request.body.hasOwnProperty("name")) {
+        reply.send(JSON.stringify({
+          sucess: false,
+          error: "No 'name' argument passed"
+        }))
+        return
+      }
+      if (request.body.name.trim() == "") {
+        reply.send(JSON.stringify({
+          sucess: false,
+          error: "Empty 'name' argument"
+        }))
+        return
+      }
+      var lib_path = 'libraries/'+request.body.name
+      var library;
+      try {
+        library = JSON.parse(fs.readFileSync(lib_path))
+      } catch (err) {
+        reply.send(JSON.stringify({
+          sucess: false,
+          error: "Library not found"
+        }))
+        return
+      }
+      try {
+        library.lib = await organizer.folder(library.path, library.type)
+      } catch (err) {
+        reply.send(JSON.stringify({
+          sucess: false,
+          error: "An error has occured while parsing the library"
+        }))
+        console.log(err)
+        return
+      }
+      fs.writeFileSync(lib_path, JSON.stringify(library), function (err) {
+          if (err) throw err;
+      });
+      console.log('Library "'+request.body.name+'" scaned !');
+      reply.send(JSON.stringify({
+        sucess: true
+      }))
+    } else {
       reply.send(JSON.stringify({
         sucess: false,
-        error: "An error has occured while parsing the library"
-      }))
-      console.log(err)
+        error: "Not authenticated"
+      }));
       return
     }
-    fs.writeFileSync(lib_path, JSON.stringify(library), function (err) {
-        if (err) throw err;
-    });
-    console.log('Library "'+request.body.name+'" scaned !');
+  } else {
     reply.send(JSON.stringify({
-      sucess: true
-    }))
+      sucess: false,
+      error: "Not authenticated"
+     }));
+    return
+  }
 })
 
 fastify.post('/del', async (request, reply) => {
