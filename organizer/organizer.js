@@ -93,7 +93,7 @@ async function add_metada_show(library) {
     for (var entry in library) {
         var candidates = await metadata.get_potential_show(entry);
         var min = -1;
-        var id;
+        var ids = [];
         for (var candidate in candidates.results) {
             var name = candidates.results[candidate].name;
             var original_name = candidates.results[candidate].original_name;
@@ -103,10 +103,29 @@ async function add_metada_show(library) {
             );
             if (distance < min || min == -1) {
                 min = distance;
-                id = candidates.results[candidate].id;
+                ids = [ candidates.results[candidate].id ];
+            }
+            else if (distance == min) {
+                ids.push(candidates.results[candidate].id);
             }
         }
-        var meta = await metadata.get_show(id);
+        var kepted;
+        var min = -1;
+        if (ids.length > 1) {
+             for (var id in ids) {
+                 var show = await metadata.get_show(ids[id]);
+                 var meta = show.meta;
+                 var content = library[entry].content;
+                 var diff = Math.abs(Object.keys(content).length - Object.keys(meta).length);
+                 if (diff < min || min == -1) {
+                     min = diff;
+                     kepted = ids[id];
+                 }
+             }
+        } else {
+            kepted = ids[0];
+        }
+        var meta = await metadata.get_show(kepted);
         library[entry].name = meta.name;
         library[entry].thumb = meta.thumb;
         library[entry].backdrop = meta.backdrop;
